@@ -2,5 +2,5 @@ services:
   - type: web
     name: kingsenterprises-backend
     env: node
-    buildCommand: npm install && node_modules/.bin/prisma generate
+    buildCommand: npm install && node_modules/.bin/prisma migrate deploy && node_modules/.bin/prisma generate
     startCommand: node src/server.js
