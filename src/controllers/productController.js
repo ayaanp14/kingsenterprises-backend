@@ -83,7 +83,7 @@ export const getProductById = async (req, res) => {
 // Create new product (Admin only)
 export const createProduct = async (req, res) => {
   try {
-    const { name, description, price, imageUrl, category, stock } = req.body;
+    const { name, description, price, mrp, imageUrl, category, stock } = req.body;
 
     if (!name || !description || price === undefined || !imageUrl || !category) {
       return res.status(400).json({ message: "All product fields (name, description, price, imageUrl, category) are required" });
@@ -94,6 +94,7 @@ export const createProduct = async (req, res) => {
         name,
         description,
         price: parseFloat(price),
+        mrp: mrp !== undefined ? parseFloat(mrp) : 0,
         imageUrl,
         category,
         stock: stock !== undefined ? parseInt(stock) : 10
@@ -107,59 +108,49 @@ export const createProduct = async (req, res) => {
   }
 };
 
-// Update existing product (Admin only)
+// Update existing product (Admin only) — single DB query (no pre-check)
 export const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, price, imageUrl, category, stock } = req.body;
-
-    const existingProduct = await prisma.product.findUnique({
-      where: { id }
-    });
-
-    if (!existingProduct) {
-      return res.status(404).json({ message: "Product not found" });
-    }
+    const { name, description, price, mrp, imageUrl, category, stock } = req.body;
 
     const product = await prisma.product.update({
       where: { id },
       data: {
-        name: name !== undefined ? name : existingProduct.name,
-        description: description !== undefined ? description : existingProduct.description,
-        price: price !== undefined ? parseFloat(price) : existingProduct.price,
-        imageUrl: imageUrl !== undefined ? imageUrl : existingProduct.imageUrl,
-        category: category !== undefined ? category : existingProduct.category,
-        stock: stock !== undefined ? parseInt(stock) : existingProduct.stock
+        ...(name !== undefined && { name }),
+        ...(description !== undefined && { description }),
+        ...(price !== undefined && { price: parseFloat(price) }),
+        ...(mrp !== undefined && { mrp: parseFloat(mrp) }),
+        ...(imageUrl !== undefined && { imageUrl }),
+        ...(category !== undefined && { category }),
+        ...(stock !== undefined && { stock: parseInt(stock) }),
       }
     });
 
     return res.json(product);
   } catch (error) {
+    if (error.code === 'P2025') {
+      return res.status(404).json({ message: "Product not found" });
+    }
     console.error("Update Product Error:", error);
     return res.status(500).json({ message: "Server error updating product", error: error.message });
   }
 };
 
-// Delete product (Admin only)
+// Delete product (Admin only) — single DB query (no pre-check)
 export const deleteProduct = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const existingProduct = await prisma.product.findUnique({
-      where: { id }
-    });
-
-    if (!existingProduct) {
-      return res.status(404).json({ message: "Product not found" });
-    }
-
-    await prisma.product.delete({
-      where: { id }
-    });
+    await prisma.product.delete({ where: { id } });
 
     return res.json({ message: "Product deleted successfully" });
   } catch (error) {
+    if (error.code === 'P2025') {
+      return res.status(404).json({ message: "Product not found" });
+    }
     console.error("Delete Product Error:", error);
     return res.status(500).json({ message: "Server error deleting product", error: error.message });
   }
 };
+
